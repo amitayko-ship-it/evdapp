@@ -4,6 +4,8 @@ import {
   getUserById,
   getNotificationPreferences,
   upsertNotificationPreferences,
+  getNotificationSettings,
+  updateNotificationSettings,
   updateEquipmentStatus,
   getEquipmentById,
   getWorkshopById,
@@ -304,4 +306,73 @@ router.post("/reports/:id/approve", async (req: Request, res: Response) => {
   }
 
   res.json(report);
+});
+
+// ---- Global notification settings (admin) ----
+
+/**
+ * GET /api/notifications/settings
+ * Returns system-wide notification configuration.
+ */
+router.get("/notifications/settings", async (_req: Request, res: Response) => {
+  const settings = await getNotificationSettings();
+  res.json(settings);
+});
+
+/**
+ * PATCH /api/notifications/settings
+ * Update system-wide notification settings (admin only).
+ * Body: any subset of NotificationSettings fields.
+ */
+router.patch("/notifications/settings", async (req: Request, res: Response) => {
+  const allowedKeys = [
+    "workshopCreatedEnabled",
+    "workshopUpdatedEnabled",
+    "workshopCancelledEnabled",
+    "equipmentStatusEnabled",
+    "equipmentReadyEnabled",
+    "processAssignedEnabled",
+    "reportApprovedEnabled",
+    "monthlyReminderEnabled",
+    "monthlyReminderDay",
+    "monthlyReminderTime",
+  ];
+
+  const patch: Record<string, boolean | number | string> = {};
+  for (const key of allowedKeys) {
+    if (key in req.body) patch[key] = req.body[key];
+  }
+
+  // Validate monthlyReminderDay range
+  if ("monthlyReminderDay" in patch) {
+    const day = Number(patch.monthlyReminderDay);
+    if (!Number.isInteger(day) || day < 1 || day > 28) {
+      return res.status(400).json({ error: "monthlyReminderDay must be between 1 and 28" });
+    }
+  }
+
+  // Validate monthlyReminderTime format HH:MM
+  if ("monthlyReminderTime" in patch) {
+    if (!/^\d{2}:\d{2}$/.test(String(patch.monthlyReminderTime))) {
+      return res.status(400).json({ error: "monthlyReminderTime must be in HH:MM format" });
+    }
+  }
+
+  const updated = await updateNotificationSettings(patch as any);
+  res.json(updated);
+});
+
+/**
+ * GET /api/users/:userId/notification-preferences
+ * Returns notification preferences for a specific user (for admin overview).
+ */
+router.get("/users/:userId/notification-preferences", async (req: Request, res: Response) => {
+  const userId = Number(req.params.userId);
+  const user = await getUserById(userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  let prefs = await getNotificationPreferences(userId);
+  if (!prefs) prefs = await upsertNotificationPreferences(userId, {});
+
+  res.json({ user, prefs });
 });

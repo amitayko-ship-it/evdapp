@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, pgEnum, time } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -87,6 +87,30 @@ export const monthlyReports = pgTable("monthly_reports", {
   approvedById: integer("approved_by_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Global notification settings (admin-controlled, system-wide)
+// One row per "key" – acts as a key-value store for notification config.
+export const notificationSettings = pgTable("notification_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  // Global toggles – disable a notification type for the whole system
+  workshopCreatedEnabled: boolean("workshop_created_enabled").notNull().default(true),
+  workshopUpdatedEnabled: boolean("workshop_updated_enabled").notNull().default(true),
+  workshopCancelledEnabled: boolean("workshop_cancelled_enabled").notNull().default(true),
+  equipmentStatusEnabled: boolean("equipment_status_enabled").notNull().default(true),
+  equipmentReadyEnabled: boolean("equipment_ready_enabled").notNull().default(true),
+  processAssignedEnabled: boolean("process_assigned_enabled").notNull().default(true),
+  reportApprovedEnabled: boolean("report_approved_enabled").notNull().default(true),
+  // Monthly report reminder settings
+  monthlyReminderEnabled: boolean("monthly_reminder_enabled").notNull().default(true),
+  // Day of month to send the reminder (1–28)
+  monthlyReminderDay: integer("monthly_reminder_day").notNull().default(25),
+  // Time of day to send (HH:MM, stored as text for simplicity)
+  monthlyReminderTime: text("monthly_reminder_time").notNull().default("09:00"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type NotificationSettings = typeof notificationSettings.$inferSelect;
+export type InsertNotificationSettings = typeof notificationSettings.$inferInsert;
 
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users);

@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import {
   users,
   notificationPreferences,
+  notificationSettings,
   processes,
   workshops,
   equipment,
@@ -13,6 +14,7 @@ import {
   type InsertUser,
   type NotificationPreferences,
   type InsertNotificationPreferences,
+  type NotificationSettings,
   type Process,
   type Workshop,
   type Equipment,
@@ -97,6 +99,31 @@ export async function getUsersForNotification(
         ? eq(users.id, userIds[0])
         : (users.id as any).inArray(userIds)
     );
+}
+
+// --- Global notification settings ---
+
+const SETTINGS_ROW_ID = 1; // single-row config table
+
+export async function getNotificationSettings(): Promise<NotificationSettings> {
+  const [row] = await db.select().from(notificationSettings).where(eq(notificationSettings.id, SETTINGS_ROW_ID));
+  if (row) return row;
+
+  // Seed default row on first access
+  const [created] = await db.insert(notificationSettings).values({ id: SETTINGS_ROW_ID }).returning();
+  return created;
+}
+
+export async function updateNotificationSettings(
+  data: Partial<Omit<NotificationSettings, "id" | "updatedAt">>
+): Promise<NotificationSettings> {
+  await getNotificationSettings(); // ensure row exists
+  const [updated] = await db
+    .update(notificationSettings)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(notificationSettings.id, SETTINGS_ROW_ID))
+    .returning();
+  return updated;
 }
 
 // --- Processes ---
