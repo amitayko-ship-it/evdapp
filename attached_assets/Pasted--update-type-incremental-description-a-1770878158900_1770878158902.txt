@@ -1,0 +1,82 @@
+{
+  "update_type": "incremental",
+  "description": "עדכון תרגילים וניהול כמויות לפי קבוצות",
+  "activities_update": [
+    {
+      "activity": "ג'אגלינג",
+      "equipment": [
+        {"item": "דליים", "quantity": 2, "scalable": true},
+        {"item": "כדורים וחפצים", "quantity": 20, "scalable": true},
+        {"item": "בלונים עם מים", "quantity": 12, "scalable": true},
+        {"item": "ביצים", "quantity": 6, "scalable": true}
+      ]
+    },
+    {
+      "activity": "פירמידת טרזן",
+      "equipment": [
+        {"item": "חבל אדום", "quantity": 1, "scalable": true},
+        {"item": "מעגלי חבלים צהובים", "quantity": 20, "scalable": true},
+        {"item": "עיגולי סיליקון (מדרכי מקלדת)", "quantity": 6, "scalable": true}
+      ]
+    },
+    {
+      "activity": "שלושת האיים",
+      "equipment": [
+        {"item": "סט חבלים (כחול, אדום, צהוב)", "quantity": 1, "scalable": true},
+        {"item": "דלי עם 3 כדורי טניס", "quantity": 1, "scalable": true},
+        {"item": "כיסויי עיניים", "quantity": 10, "scalable": true},
+        {"item": "שעון עצר", "quantity": 1, "scalable": false},
+        {"item": "ערכת חידות (אזיקים, מסמרים, טנגרם)", "quantity": 1, "scalable": true},
+        {"item": "מדרכי עץ / מנעלים", "quantity": 1, "scalable": true}
+      ]
+    },
+    {
+      "activity": "יהלום",
+      "equipment": [
+        {"item": "מקלות במבוק", "quantity": 20, "scalable": true},
+        {"item": "מסקינטייפ", "quantity": 4, "scalable": true},
+        {"item": "מספריים", "quantity": 1, "scalable": true},
+        {"item": "חבל אדום", "quantity": 1, "scalable": true},
+        {"item": "מדבקות לבנות + טוש", "quantity": 20, "scalable": true},
+        {"item": "אופציונלי: ערכת נסיוב", "quantity": 1, "scalable": true}
+      ]
+    },
+    {
+      "activity": "מקלדת",
+      "equipment": [
+        {"item": "חבל כחול", "quantity": 1, "scalable": true},
+        {"item": "סט מספרים 1-30", "quantity": 1, "scalable": true},
+        {"item": "חבלים אדומים", "quantity": 2, "scalable": true}
+      ]
+    },
+    {
+      "activity": "ניווט",
+      "options": ["פארק הירקון", "נען", "ברוטיה", "עקבה", "פארק קנדה", "נחל גחר", "כתף שאול"],
+      "equipment": [{"item": "מפות ומצפנים בהתאם לתא שטח", "quantity": 1, "scalable": true}]
+    },
+    {
+      "activity": "רוב גולדברג",
+      "notes": "ציוד מחושב לקבוצה של 18 משתתפים",
+      "equipment": [
+        {"item": "ערכות פלסטיק", "quantity": 3, "scalable": true},
+        {"item": "במבוקים", "quantity": 18, "scalable": true},
+        {"item": "מדרכי עץ", "quantity": 12, "scalable": true},
+        {"item": "ערכת צינורות PVC ומקלות מטאטא", "quantity": 4, "scalable": true},
+        {"item": "בלונים ומסקינטייפ ספייר", "quantity": 1, "scalable": true}
+      ]
+    },
+    {
+      "activity": "קוד פתוח",
+      "equipment": [
+        {"item": "תיבות עץ (עם 2 מנעולי קומבינציה ו-2 מפתחות)", "quantity": 3, "scalable": true},
+        {"item": "דלי + נסורת + מפתחות בלאי", "quantity": 1, "scalable": true},
+        {"item": "דף למינציה (טבלת שליטה)", "quantity": 1, "scalable": false},
+        {"item": "חבל אדום", "quantity": 1, "scalable": true},
+        {"item": "פותחן יין", "quantity": 1, "scalable": false},
+        {"item": "כוסות חד\"פ ליין", "quantity": 50, "scalable": true},
+        {"item": "בקבוקי יין", "quantity": 2, "scalable": true},
+        {"item": "אופציונלי: שטיח מעופף, אבנים לרוג'ום", "quantity": 1, "scalable": true}
+      ]
+    }
+  ]
+}

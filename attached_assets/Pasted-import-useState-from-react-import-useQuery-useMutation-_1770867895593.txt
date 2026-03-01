@@ -1,0 +1,353 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Package, Search, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Equipment, Process } from "@/../../shared/schema";
+import { EQUIPMENT_STATUS } from "@/../../shared/schema";
+
+const STATUS_LABELS: Record<string, string> = {
+  ORDERED: 'נמצא בהזמנה',
+  READY: 'מוכן לאיסוף',
+  PICKED_UP: 'נאסף',
+  RETURNED: 'הוחזר',
+};
+
+export default function WarehouseDashboard() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: equipment = [], isLoading: equipmentLoading } = useQuery({
+    queryKey: ["/api/equipment"],
+  });
+
+  const { data: processes = [] } = useQuery({
+    queryKey: ["/api/processes"],
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ equipmentId, toStatus }: { equipmentId: number, toStatus: string }) => {
+      const response = await apiRequest("POST", `/api/equipment/${equipmentId}/status`, {
+        toStatus,
+        userRole: "warehouse",
+        userId: 1,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast({
+        title: "סטטוס עודכן בהצלחה",
+        description: "הציוד סומן כמוכן לאיסוף",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "שגיאה בעדכון סטטוס",
+        description: error.message || "אין לך הרשאה לבצע פעולה זו",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case EQUIPMENT_STATUS.ORDERED: return 'bg-blue-100 text-blue-800';
+      case EQUIPMENT_STATUS.READY: return 'bg-green-100 text-green-800';
+      case EQUIPMENT_STATUS.PICKED_UP: return 'bg-yellow-100 text-yellow-800';
+      case EQUIPMENT_STATUS.RETURNED: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case EQUIPMENT_STATUS.ORDERED: return <Clock className="h-4 w-4" />;
+      case EQUIPMENT_STATUS.READY: return <CheckCircle className="h-4 w-4" />;
+      case EQUIPMENT_STATUS.PICKED_UP: return <Package className="h-4 w-4" />;
+      case EQUIPMENT_STATUS.RETURNED: return <CheckCircle className="h-4 w-4" />;
+      default: return <AlertCircle className="h-4 w-4" />;
+    }
+  };
+
+  const getStatusLabel = (status: string) => STATUS_LABELS[status] || status;
+
+  const getProcessDetails = (clientName: string) => {
+    return processes.find((p: Process) => p.clientName === clientName);
+  };
+
+  const filteredEquipment = equipment.filter((item: Equipment) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      item.name.toLowerCase().includes(searchLower) ||
+      item.clientName.toLowerCase().includes(searchLower) ||
+      item.items.toLowerCase().includes(searchLower) ||
+      getStatusLabel(item.status).toLowerCase().includes(searchLower)
+    );
+  });
+
+  const pendingEquipment = filteredEquipment.filter((item: Equipment) => item.status === EQUIPMENT_STATUS.ORDERED);
+  const readyEquipment = filteredEquipment.filter((item: Equipment) => item.status === EQUIPMENT_STATUS.READY);
+  const collectedEquipment = filteredEquipment.filter((item: Equipment) => item.status === EQUIPMENT_STATUS.PICKED_UP);
+  const returnedEquipment = filteredEquipment.filter((item: Equipment) => item.status === EQUIPMENT_STATUS.RETURNED);
+
+  if (equipmentLoading) {
+    return <div className="flex items-center justify-center h-64">טוען...</div>;
+  }
+
+  const EquipmentCard = ({ item }: { item: Equipment }) => {
+    const process = getProcessDetails(item.clientName);
+    
+    return (
+      <Card key={item.id} className="hover:shadow-md transition-shadow">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg">{item.name}</h3>
+              <p className="text-gray-600">{item.items}</p>
+              
+              <div className="mt-2 space-y-1">
+                <p className="text-sm font-medium">לקוח: {item.clientName}</p>
+                {process && (
+                  <>
+                    <p className="text-sm text-gray-500">סוג: {process.processType}</p>
+                    <p className="text-sm text-gray-500">
+                      תאריך: {new Date(process.startDate).toLocaleDateString('he-IL')}
+                    </p>
+                    {process.location && (
+                      <p className="text-sm text-gray-500">מיקום: {process.location}</p>
+                    )}
+                  </>
+                )}
+              </div>
+              
+              {item.notes && (
+                <p className="text-sm text-gray-500 mt-2 bg-gray-50 p-2 rounded">
+                  {item.notes}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex flex-col items-end gap-2">
+              <Badge className={`${getStatusColor(item.status)} flex items-center gap-1`}>
+                {getStatusIcon(item.status)}
+                {getStatusLabel(item.status)}
+              </Badge>
+              
+              {item.status === EQUIPMENT_STATUS.ORDERED && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      סמן מוכן לאיסוף
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>אישור הכנת ציוד</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        אני מאשר/ת שהציוד הוכן בפועל ומוכן לאיסוף.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-row-reverse gap-2">
+                      <AlertDialogAction
+                        onClick={() => updateStatusMutation.mutate({ 
+                          equipmentId: item.id, 
+                          toStatus: EQUIPMENT_STATUS.READY 
+                        })}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        אישור
+                      </AlertDialogAction>
+                      <AlertDialogCancel>ביטול</AlertDialogCancel>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="container mx-auto p-6" dir="rtl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">ממשק מחסנאי</h1>
+        <p className="text-gray-600 mt-2">ניהול ועדכון סטטוס ציוד</p>
+      </div>
+
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="חפש לפי שם ציוד, לקוח או סטטוס..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pr-10"
+          />
+        </div>
+      </div>
+
+      <Tabs defaultValue="pending" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="pending" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            ממתין להכנה ({pendingEquipment.length})
+          </TabsTrigger>
+          <TabsTrigger value="ready" className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            מוכן לאיסוף ({readyEquipment.length})
+          </TabsTrigger>
+          <TabsTrigger value="collected" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            נאסף ({collectedEquipment.length})
+          </TabsTrigger>
+          <TabsTrigger value="returned" className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            הוחזר ({returnedEquipment.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-blue-600" />
+                ציוד הממתין להכנה
+              </CardTitle>
+              <CardDescription>
+                פריטי ציוד שהוזמנו ומחכים להכנה למחסן
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          {pendingEquipment.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <CheckCircle className="h-12 w-12 text-green-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">כל הציוד מוכן!</h3>
+                <p className="text-gray-500 text-center">אין ציוד הממתין להכנה</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {pendingEquipment.map((item: Equipment) => (
+                <EquipmentCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="ready" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                ציוד מוכן לאיסוף
+              </CardTitle>
+              <CardDescription>
+                פריטי ציוד שהוכנו ומחכים למנחים לאסוף
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          {readyEquipment.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Package className="h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-500 text-center">אין ציוד מוכן לאיסוף</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {readyEquipment.map((item: Equipment) => (
+                <EquipmentCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="collected" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-yellow-600" />
+                ציוד שנאסף
+              </CardTitle>
+              <CardDescription>
+                פריטי ציוד שנאספו על ידי המנחים
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          {collectedEquipment.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Package className="h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-500 text-center">אין ציוד שנאסף</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {collectedEquipment.map((item: Equipment) => (
+                <EquipmentCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="returned" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-gray-600" />
+                ציוד שהוחזר
+              </CardTitle>
+              <CardDescription>
+                פריטי ציוד שהוחזרו למחסן
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          {returnedEquipment.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <CheckCircle className="h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-500 text-center">אין ציוד שהוחזר</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {returnedEquipment.map((item: Equipment) => (
+                <EquipmentCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 98%;
+    --foreground: 220 20% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 14%;
+    --primary: 210 52% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 30% 95%;
+    --secondary-foreground: 220 20% 14%;
+    --muted: 40 15% 95%;
+    --muted-foreground: 215 12% 50%;
+    --accent: 48 78% 52%;
+    --accent-foreground: 220 20% 14%;
+    --destructive: 4 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 15% 90%;
+    --input: 40 15% 88%;
+    --ring: 48 78% 52%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: "Heebo", sans-serif;
+    direction: rtl;
+  }
+}
+
+@layer components {
+  .stone-bg-pattern {
+    background-image:
+      radial-gradient(ellipse 120px 80px at 15% 20%, rgba(44, 95, 138, 0.04) 0%, transparent 100%),
+      radial-gradient(ellipse 100px 60px at 80% 70%, rgba(90, 143, 60, 0.03) 0%, transparent 100%),
+      radial-gradient(ellipse 80px 50px at 50% 45%, rgba(232, 200, 32, 0.03) 0%, transparent 100%),
+      radial-gradient(ellipse 140px 90px at 70% 15%, rgba(44, 95, 138, 0.03) 0%, transparent 100%),
+      radial-gradient(ellipse 90px 70px at 25% 80%, rgba(90, 143, 60, 0.025) 0%, transparent 100%);
+  }
+
+  .brand-focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2;
+  }
+}
+
+@layer base {
+  input:focus, select:focus, textarea:focus {
+    @apply outline-none ring-2 ring-brand-yellow/50 border-brand-yellow;
+  }
+  button:focus-visible {
+    @apply outline-none ring-2 ring-brand-yellow ring-offset-2;
+  }
+}

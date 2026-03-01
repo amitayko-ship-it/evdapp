@@ -1,0 +1,461 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar, Upload, Star } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
+
+const workshopSchema = z.object({
+  participants: z.coerce.number().min(1, "מספר משתתפים נדרש"),
+  location: z.string().min(1, "מיקום נדרש"),
+  date: z.string().min(1, "תאריך נדרש"),
+  checklist: z.object({
+    medic: z.enum(["yes", "no"]).optional(),
+    breakfast: z.enum(["yes", "no"]).optional(),
+    lunch: z.enum(["yes", "no"]).optional(),
+    dinner: z.enum(["yes", "no"]).optional(),
+    campfire: z.enum(["yes", "no"]).optional(),
+    workOrder: z.enum(["yes", "no"]).optional(),
+    safetyBriefing: z.enum(["yes", "no"]).optional(),
+    assistant: z.enum(["yes", "no"]).optional(),
+    specialEquipment: z.enum(["yes", "no"]).optional(),
+  }),
+  selectedExercises: z.array(z.object({
+    exerciseId: z.number(),
+    equipment: z.array(z.string()),
+    notes: z.string().optional(),
+  })).default([]),
+});
+
+type WorkshopFormData = z.infer<typeof workshopSchema>;
+
+export default function WorkshopBooking() {
+  const [, setLocation] = useLocation();
+  const [selectedExerciseIds, setSelectedExerciseIds] = useState<number[]>([]);
+  const [exerciseEquipment, setExerciseEquipment] = useState<Record<number, string[]>>({});
+  const [exerciseNotes, setExerciseNotes] = useState<Record<number, string>>({});
+  const [selectedSubExercises, setSelectedSubExercises] = useState<Record<number, string[]>>({});
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: exercises, isLoading: exercisesLoading } = useQuery({
+    queryKey: ["/api/exercises"],
+  });
+
+  const form = useForm<WorkshopFormData>({
+    resolver: zodResolver(workshopSchema),
+    defaultValues: {
+      participants: 0,
+      location: "",
+      date: "",
+      checklist: {
+        medic: undefined,
+        breakfast: undefined,
+        lunch: undefined,
+        dinner: undefined,
+        campfire: undefined,
+        workOrder: undefined,
+        safetyBriefing: undefined,
+        assistant: undefined,
+        specialEquipment: undefined,
+      },
+      selectedExercises: [],
+    },
+  });
+
+  const createWorkshopMutation = useMutation({
+    mutationFn: async (data: WorkshopFormData) => {
+      const selectedExercises = selectedExerciseIds.map(id => ({
+        exerciseId: id,
+        equipment: exerciseEquipment[id] || [],
+        notes: exerciseNotes[id] || "",
+      }));
+
+      const response = await apiRequest("POST", "/api/workshops", {
+        ...data,
+        date: new Date(data.date).toISOString(),
+        selectedExercises,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workshops"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      toast({
+        title: "הזמנת סדנה נשלחה בהצלחה",
+        description: "ההזמנה נשלחה למשרד ולמחסן",
+      });
+      setLocation("/");
+    },
+    onError: () => {
+      toast({
+        title: "שגיאה בשליחת ההזמנה",
+        description: "אנא נסה שנית",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: WorkshopFormData) => {
+    const selectedExercises = selectedExerciseIds.map(exerciseId => ({
+      exerciseId,
+      equipment: exerciseEquipment[exerciseId] || [],
+      notes: exerciseNotes[exerciseId] || ""
+    }));
+
+    const submissionData = {
+      ...data,
+      selectedExercises
+    };
+
+    createWorkshopMutation.mutate(submissionData);
+  };
+
+  const handleExerciseToggle = (exerciseId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedExerciseIds(prev => [...prev, exerciseId]);
+      
+      const exercise = exercises?.find((ex: any) => ex.id === exerciseId);
+      if (exercise && exercise.equipmentItems && !exercise.subExercises) {
+        const allEquipment = [...exercise.equipmentItems, "שונות"];
+        setExerciseEquipment(prev => ({
+          ...prev,
+          [exerciseId]: allEquipment
+        }));
+      }
+    } else {
+      setSelectedExerciseIds(prev => prev.filter(id => id !== exerciseId));
+      setExerciseEquipment(prev => {
+        const { [exerciseId]: _, ...rest } = prev;
+        return rest;
+      });
+      setExerciseNotes(prev => {
+        const { [exerciseId]: _, ...rest } = prev;
+        return rest;
+      });
+      setSelectedSubExercises(prev => {
+        const { [exerciseId]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
+  const handleSubExerciseToggle = (exerciseId: number, subName: string, checked: boolean) => {
+    const exercise = exercises?.find((ex: any) => ex.id === exerciseId);
+    const subExercise = exercise?.subExercises?.find((sub: any) => sub.name === subName);
+    
+    if (checked) {
+      setSelectedSubExercises(prev => ({
+        ...prev,
+        [exerciseId]: [...(prev[exerciseId] || []), subName]
+      }));
+      if (subExercise?.equipmentItems) {
+        setExerciseEquipment(prev => ({
+          ...prev,
+          [exerciseId]: Array.from(new Set([...(prev[exerciseId] || []), ...subExercise.equipmentItems]))
+        }));
+      }
+    } else {
+      setSelectedSubExercises(prev => ({
+        ...prev,
+        [exerciseId]: (prev[exerciseId] || []).filter((n: string) => n !== subName)
+      }));
+      if (subExercise?.equipmentItems) {
+        setExerciseEquipment(prev => ({
+          ...prev,
+          [exerciseId]: (prev[exerciseId] || []).filter((item: string) => !subExercise.equipmentItems.includes(item))
+        }));
+      }
+    }
+  };
+
+  const handleEquipmentToggle = (exerciseId: number, equipmentItem: string, checked: boolean) => {
+    setExerciseEquipment(prev => {
+      const current = prev[exerciseId] || [];
+      if (checked) {
+        return { ...prev, [exerciseId]: [...current, equipmentItem] };
+      } else {
+        return { ...prev, [exerciseId]: current.filter(item => item !== equipmentItem) };
+      }
+    });
+  };
+
+  if (exercisesLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="animate-pulse">
+          <div className="bg-gray-200 rounded-lg h-64"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Card className="shadow-md">
+        <CardContent className="p-6">
+          <div className="flex items-center mb-6">
+            <div className="w-10 h-10 bg-brand-green rounded-lg flex items-center justify-center ml-3">
+              <Calendar className="text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-brand-dark">הזמנת סדנה</h2>
+          </div>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              {/* Basic Information */}
+              <div>
+                <h3 className="text-lg font-medium text-brand-dark mb-4">פרטים בסיסיים</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="participants"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-brand-dark">מספר משתתפים</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="20" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="location"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-brand-dark">מיקום</FormLabel>
+                        <FormControl>
+                          <Input placeholder="כתובת מלאה" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-brand-dark">תאריך</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Checklist */}
+              <div>
+                <h3 className="text-lg font-medium text-brand-dark mb-4">רשימת בדיקות</h3>
+                <div className="space-y-4">
+                  {[
+                    { key: "medic", label: "חובש" },
+                    { key: "breakfast", label: "ארוחת בוקר" },
+                    { key: "lunch", label: "ארוחת צהרים" },
+                    { key: "dinner", label: "ארוחת ערב" },
+                    { key: "campfire", label: "ערב על מדורה" },
+                    { key: "workOrder", label: "הזמנת עבודה חתומה" },
+                    { key: "safetyBriefing", label: "שיחת תוכן בטיחות" },
+                    { key: "assistant", label: "עוזר לוגיסטי" },
+                    { key: "specialEquipment", label: "ציוד מיוחד" },
+                  ].map((item) => (
+                    <FormField
+                      key={item.key}
+                      control={form.control}
+                      name={`checklist.${item.key}`}
+                      render={({ field }) => (
+                        <FormItem className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                          <FormLabel className="text-base font-medium text-brand-dark mb-3 block">
+                            {item.label}
+                          </FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              className="flex gap-6"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="yes" id={`${item.key}-yes`} />
+                                <label htmlFor={`${item.key}-yes`} className="text-green-600 font-medium cursor-pointer">
+                                  כן
+                                </label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no" id={`${item.key}-no`} />
+                                <label htmlFor={`${item.key}-no`} className="text-red-600 font-medium cursor-pointer">
+                                  לא
+                                </label>
+                              </div>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Schedule Upload */}
+              <div>
+                <h3 className="text-lg font-medium text-brand-dark mb-4">לוח זמנים</h3>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-brand-green transition-colors">
+                  <Upload className="mx-auto text-3xl text-gray-400 mb-4" />
+                  <p className="text-sm text-gray-600 mb-2">גרור קובץ לוח זמנים או לחץ להעלאה</p>
+                  <p className="text-xs text-gray-500">PDF, Word, או תמונה</p>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  />
+                </div>
+              </div>
+
+              {/* Exercise Selection */}
+              <div>
+                <h3 className="text-lg font-medium text-brand-dark mb-4">בחירת תרגילים</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {exercises && exercises.map((exercise: any) => (
+                    <div key={exercise.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="flex items-center cursor-pointer">
+                          <Checkbox
+                            checked={selectedExerciseIds.includes(exercise.id)}
+                            onCheckedChange={(checked) => handleExerciseToggle(exercise.id, checked as boolean)}
+                            className="ml-3"
+                          />
+                          <span className="font-medium text-brand-dark">{exercise.name}</span>
+                        </label>
+                        {exercise.popular && (
+                          <span className="text-xs bg-brand-green bg-opacity-10 text-brand-green px-2 py-1 rounded flex items-center">
+                            <Star className="w-3 h-3 ml-1" />
+                            פופולרי
+                          </span>
+                        )}
+                      </div>
+
+                      {selectedExerciseIds.includes(exercise.id) && (
+                        <div className="space-y-2 mt-3">
+                          {exercise.subExercises && exercise.subExercises.length > 0 ? (
+                            <>
+                              <p className="text-sm font-medium text-gray-700">בחר תת-תרגילים:</p>
+                              <div className="grid grid-cols-1 gap-2 text-xs border-r-2 border-brand-blue pr-3">
+                                {exercise.subExercises.map((sub: any, index: number) => (
+                                  <label key={index} className="flex items-center p-2 bg-gray-50 rounded">
+                                    <Checkbox
+                                      checked={selectedSubExercises[exercise.id]?.includes(sub.name) || false}
+                                      onCheckedChange={(checked) => handleSubExerciseToggle(exercise.id, sub.name, checked as boolean)}
+                                      className="ml-2"
+                                    />
+                                    <span className="font-medium">{sub.name}</span>
+                                    <span className="text-gray-500 mr-2">({sub.equipmentItems?.join(", ")})</span>
+                                  </label>
+                                ))}
+                              </div>
+                              {(selectedSubExercises[exercise.id]?.length || 0) > 0 && (
+                                <>
+                                  <p className="text-sm font-medium text-gray-700 mt-3">ציוד שנבחר:</p>
+                                  <div className="grid grid-cols-2 gap-2 text-xs">
+                                    {exerciseEquipment[exercise.id]?.map((item: string, index: number) => (
+                                      <label key={index} className="flex items-center">
+                                        <Checkbox
+                                          checked={true}
+                                          onCheckedChange={(checked) => handleEquipmentToggle(exercise.id, item, checked as boolean)}
+                                          className="ml-2"
+                                        />
+                                        {item}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium text-gray-700">פריטי ציוד:</p>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                {exercise.equipmentItems?.map((item: string, index: number) => (
+                                  <label key={index} className="flex items-center">
+                                    <Checkbox
+                                      checked={exerciseEquipment[exercise.id]?.includes(item) || false}
+                                      onCheckedChange={(checked) => handleEquipmentToggle(exercise.id, item, checked as boolean)}
+                                      className="ml-2"
+                                    />
+                                    {item}
+                                  </label>
+                                ))}
+                                <div className="col-span-2 mt-2">
+                                  <label className="flex items-center mb-2">
+                                    <Checkbox
+                                      checked={exerciseEquipment[exercise.id]?.includes("שונות") || false}
+                                      onCheckedChange={(checked) => handleEquipmentToggle(exercise.id, "שונות", checked as boolean)}
+                                      className="ml-2"
+                                    />
+                                    שונות
+                                  </label>
+                                  {exerciseEquipment[exercise.id]?.includes("שונות") && (
+                                    <Input
+                                      className="w-full text-xs"
+                                      placeholder="פרט פריטי ציוד נוספים..."
+                                      value={exerciseNotes[exercise.id] || ""}
+                                      onChange={(e) => setExerciseNotes(prev => ({ ...prev, [exercise.id]: e.target.value }))}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                              <Textarea
+                                className="w-full mt-2 text-xs"
+                                rows={2}
+                                placeholder="הערות כלליות למנחה..."
+                                value={exerciseNotes[exercise.id] || ""}
+                                onChange={(e) => setExerciseNotes(prev => ({ ...prev, [exercise.id]: e.target.value }))}
+                              />
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4 space-x-reverse">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setLocation("/")}
+                >
+                  ביטול
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-brand-green hover:bg-brand-green/90"
+                  disabled={createWorkshopMutation.isPending}
+                >
+                  {createWorkshopMutation.isPending ? "שולח..." : "שלח הזמנה"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

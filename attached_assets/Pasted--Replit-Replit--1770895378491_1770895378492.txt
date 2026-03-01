@@ -1,0 +1,201 @@
+להדבקה ל-@Replit – הרחבת מערכת “אבן דרך” עם מודול לקוחות, ייצוא מסמכים ודוח סיכום סדנה.
+
+⸻
+
+@Replit – Extend Even Derech Logistics System (Clients, Exports, Workshop Summary)
+
+🎯 Goal
+
+Extend the system with:
+	1.	HR + Procurement contacts per client
+	2.	Work Order export (download first, auto-email in phase 2)
+	3.	Monthly instructor export
+	4.	Structured post-workshop summary module for documentation and future tenders
+
+⸻
+
+1️⃣ Client Contacts (HR + Procurement)
+
+Data Model
+
+New table: client_contacts
+	•	id (uuid)
+	•	clientName (text)
+	•	contactName (text)
+	•	email (text)
+	•	phone (text, optional)
+	•	role enum: HR | PROCUREMENT
+	•	isActive (boolean, default true)
+	•	createdAt
+	•	updatedAt
+
+Update workshops
+
+Add:
+	•	clientName (text)
+	•	hrContactId (FK client_contacts, nullable)
+	•	procurementContactId (FK client_contacts, nullable)
+
+⸻
+
+UI
+
+Admin screen: /admin/clients
+	•	Add/Edit/Deactivate contacts
+	•	Filter by client
+	•	Separate HR / Procurement
+
+Workshop creation/edit
+	•	Dropdown: HR contact
+	•	Dropdown: Procurement contact
+
+Only ADMIN/OPERATIONS can manage contacts.
+
+⸻
+
+2️⃣ Work Order Export
+
+Purpose
+
+Generate structured Work Order document per workshop.
+
+Button
+
+On workshop page:
+“ייצוא הזמנת עבודה”
+
+Document must include:
+	•	Client name
+	•	HR + Procurement contacts
+	•	Workshop date & location
+	•	Instructor
+	•	Participant count (if available)
+	•	Planned exercises
+	•	Notes
+
+Phase 1 (as requested)
+	•	Generate downloadable PDF
+	•	Download locally
+	•	User sends manually
+
+No automatic emailing yet.
+
+Permissions: ADMIN / OPERATIONS only.
+
+⸻
+
+3️⃣ Monthly Instructor Export
+
+Route
+
+/admin/monthly-report
+
+Filters
+	•	Month
+	•	Year
+	•	Optional: Instructor
+
+Export format
+
+CSV or Excel
+
+Columns:
+	•	Instructor Name
+	•	Date
+	•	Client
+	•	Location
+	•	Workshop Status
+	•	Participant count (if exists)
+
+Permissions: ADMIN / OPERATIONS only.
+
+⸻
+
+4️⃣ Workshop Summary Module (Post-Workshop)
+
+Business Rule
+
+Editable only when:
+workshop.status = RETURNED
+
+Only the assigned instructor can submit summary.
+
+⸻
+
+Data Model
+
+New table: workshop_summaries
+	•	workshopId (FK, unique)
+	•	participantsCount (number, required > 0)
+	•	actualExercises (array of exerciseIds OR text list)
+	•	instructorInsight (text, short)
+	•	dayInsight (text, short)
+	•	safetyIncident (boolean)
+	•	safetyDetails (text, required if safetyIncident=true)
+	•	issuesOrExceptions (text)
+	•	feedbackSent (boolean)
+	•	createdAt
+	•	updatedAt
+
+Do NOT store summary inside workshops table.
+
+⸻
+
+UI – Instructor Dashboard
+
+Section:
+“סיכום סדנה”
+
+Fields:
+	•	כמות משתתפים
+	•	תרגילים שהתקיימו בפועל (checkbox list)
+	•	תובנה על עצמי כמנחה
+	•	תובנה אחת מתוך היום
+	•	אירוע בטיחות – כן / לא
+	•	If yes → require פירוט
+	•	תקלות / חריגים
+	•	נשלח משוב למשתתפים (checkbox)
+
+Save button only visible if:
+	•	status = RETURNED
+	•	user.role = INSTRUCTOR
+	•	user.id = workshop.instructorId
+
+⸻
+
+5️⃣ Validation Rules
+
+Server-side:
+	•	Cannot save summary unless status = RETURNED
+	•	participantsCount must be > 0
+	•	If safetyIncident=true → safetyDetails required
+	•	Only assigned instructor can write
+	•	Admin can read but not edit
+
+⸻
+
+6️⃣ Future-Ready Design (Important)
+
+Ensure:
+	•	workshop_summaries is searchable
+	•	Text fields indexed
+	•	Data exportable later as:
+	•	“מאגר תובנות”
+	•	“דו״ח בטיחות”
+	•	Tender documentation dataset
+
+⸻
+
+7️⃣ Acceptance Criteria
+
+✔ Admin can add HR and Procurement contacts
+✔ Work Order PDF downloads correctly
+✔ Monthly instructor export works
+✔ Instructor can submit workshop summary only after RETURNED
+✔ Safety incidents are queryable
+✔ Summary data is stored separately and reusable
+
+⸻
+
+אם תרצה, השלב הבא הוא:
+להפוך את סיכום הסדנה ל״חובה לפני פתיחת סדנה חדשה״ או להוסיף לוח בקרה בטיחותי רבעוני.
