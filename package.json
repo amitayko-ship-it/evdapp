@@ -1,0 +1,32 @@
+{
+  "name": "evdapp",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "build": "esbuild server/index.ts --bundle --platform=node --outfile=dist/server.js --format=esm",
+    "start": "node dist/server.js",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.4.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@neondatabase/serverless": "^0.9.4",
+    "drizzle-orm": "^0.30.10",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "node-cron": "^3.0.3",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/express-session": "^1.17.10",
+    "@types/node": "^20.14.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/ws": "^8.5.10",
+    "drizzle-kit": "^0.21.4",
+    "esbuild": "^0.21.5",
+    "tsx": "^4.15.6",
+    "typescript": "^5.4.5"
+  }
+}
