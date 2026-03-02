@@ -11,6 +11,7 @@ import {
   clientContacts,
   workshopSummaries,
   appSettings,
+  pushSubscriptions,
   type InsertUser,
   type InsertProcess,
   type InsertWorkshop,
@@ -19,6 +20,7 @@ import {
   type InsertMonthlyReport,
   type InsertClientContact,
   type InsertWorkshopSummary,
+  type InsertPushSubscription,
 } from "../shared/schema.js";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -334,4 +336,46 @@ export async function setSetting(key: string, value: string) {
   } else {
     await db.insert(appSettings).values({ key, value });
   }
+}
+
+export async function savePushSubscription(data: InsertPushSubscription) {
+  const existing = await db
+    .select()
+    .from(pushSubscriptions)
+    .where(eq(pushSubscriptions.userId, data.userId));
+  if (existing.length > 0) {
+    const result = await db
+      .update(pushSubscriptions)
+      .set({ subscription: data.subscription })
+      .where(eq(pushSubscriptions.userId, data.userId))
+      .returning();
+    return result[0];
+  }
+  const result = await db.insert(pushSubscriptions).values(data).returning();
+  return result[0];
+}
+
+export async function deletePushSubscription(userId: number) {
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+}
+
+export async function getPushSubscriptions() {
+  return db
+    .select({
+      id: pushSubscriptions.id,
+      userId: pushSubscriptions.userId,
+      subscription: pushSubscriptions.subscription,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(pushSubscriptions)
+    .leftJoin(users, eq(pushSubscriptions.userId, users.id));
+}
+
+export async function getPushSubscriptionsByUserIds(userIds: number[]) {
+  if (userIds.length === 0) return [];
+  return db
+    .select()
+    .from(pushSubscriptions)
+    .where(sql`${pushSubscriptions.userId} = ANY(${userIds})`);
 }

@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import * as storage from "./storage.js";
 import PDFDocument from "pdfkit";
+import { initVapid, getVapidPublicKey, sendPushToSubscriptions } from "./push.js";
 
 declare module "express-session" {
   interface SessionData {
@@ -8,7 +9,9 @@ declare module "express-session" {
   }
 }
 
-export function registerRoutes(app: Express) {
+export async function registerRoutes(app: Express) {
+  await initVapid();
+
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
@@ -632,6 +635,84 @@ export function registerRoutes(app: Express) {
       if (!user || user.role !== "admin") return res.status(403).json({ error: "הרשאה נדרשת" });
       await storage.setSetting(req.params.key, req.body.value);
       res.json({ key: req.params.key, value: req.body.value });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Push notifications
+  app.get("/api/push/vapid-public-key", async (_req: Request, res: Response) => {
+    try {
+      const key = await getVapidPublicKey();
+      res.json({ publicKey: key });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/push/subscribe", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ error: "לא מחובר" });
+      const { subscription } = req.body;
+      if (!subscription) return res.status(400).json({ error: "נדרש subscription" });
+      const result = await storage.savePushSubscription({ userId, subscription });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/push/subscribe", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ error: "לא מחובר" });
+      await storage.deletePushSubscription(userId);
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/push/subscriptions", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ error: "לא מחובר" });
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ error: "הרשאה נדרשת" });
+      const subs = await storage.getPushSubscriptions();
+      res.json(subs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/push/send", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ error: "לא מחובר" });
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ error: "הרשאה נדרשת" });
+
+      const { title, body, url, userIds } = req.body;
+      if (!title || !body) return res.status(400).json({ error: "נדרש כותרת ותוכן" });
+
+      let subscriptions;
+      if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+        subscriptions = await storage.getPushSubscriptionsByUserIds(userIds);
+      } else {
+        subscriptions = await storage.getPushSubscriptions();
+      }
+
+      if (subscriptions.length === 0) {
+        return res.json({ sent: 0, message: "אין משתמשים רשומים לקבלת התראות" });
+      }
+
+      const results = await sendPushToSubscriptions(subscriptions, { title, body, url });
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+
+      res.json({ sent: succeeded, failed, total: subscriptions.length });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Route, Switch } from "wouter";
 import { AnimatePresence } from "framer-motion";
 import Header from "./components/layout/Header";
@@ -8,12 +9,19 @@ import EquipmentPage from "./pages/EquipmentPage";
 import MonthlyReportPage from "./pages/MonthlyReportPage";
 import UsersPage from "./pages/UsersPage";
 import WorkshopSummaryPage from "./pages/WorkshopSummaryPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import LoginPage from "./pages/LoginPage";
 import { useAuth } from "./hooks/useAuth";
 import { Toaster } from "./components/ui/toaster";
 
 export default function App() {
   const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -44,6 +52,7 @@ export default function App() {
             <Route path="/equipment" component={EquipmentPage} />
             <Route path="/admin/monthly-report" component={MonthlyReportPage} />
             <Route path="/admin/users" component={UsersPage} />
+            <Route path="/admin/notifications" component={NotificationsPage} />
             <Route>
               <div className="text-center py-12">
                 <h2 className="text-2xl font-bold">404 - דף לא נמצא</h2>

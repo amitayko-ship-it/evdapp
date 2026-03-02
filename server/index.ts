@@ -34,7 +34,7 @@ app.use(
   })
 );
 
-registerRoutes(app);
+await registerRoutes(app);
 
 if (isProd) {
   const publicDir = path.resolve(__dirname, "../public");

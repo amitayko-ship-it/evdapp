@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LogOut, LayoutDashboard, Calendar, Package, FileSpreadsheet, Settings, Users } from "lucide-react";
+import { LogOut, LayoutDashboard, Calendar, Package, FileSpreadsheet, Settings, Users, Bell } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/equipment", label: "מחסן", icon: Package },
   { href: "/admin/monthly-report", label: "דוח חודשי", icon: FileSpreadsheet },
   { href: "/admin/users", label: "משתמשים", icon: Users, adminOnly: true },
+  { href: "/admin/notifications", label: "התראות", icon: Bell, adminOnly: true },
 ];
 
 const roleLabels: Record<string, string> = {
