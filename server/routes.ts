@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import * as storage from "./storage.js";
 import PDFDocument from "pdfkit";
 
@@ -6,6 +6,13 @@ declare module "express-session" {
   interface SessionData {
     userId: number;
   }
+}
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "לא מחובר" });
+  }
+  next();
 }
 
 export function registerRoutes(app: Express) {
@@ -52,6 +59,9 @@ export function registerRoutes(app: Express) {
       res.json({ ok: true });
     });
   });
+
+  // Protect all routes below this line
+  app.use("/api", requireAuth);
 
   app.get("/api/users", async (_req: Request, res: Response) => {
     try {
