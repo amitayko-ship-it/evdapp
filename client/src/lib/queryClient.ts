@@ -1,7 +1,14 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
+function fullUrl(url: string) {
+  if (url.startsWith("http")) return url;
+  return `${API_BASE}${url}`;
+}
+
 const defaultQueryFn: QueryFunction = async ({ queryKey }) => {
-  const url = queryKey[0] as string;
+  const url = fullUrl(queryKey[0] as string);
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -24,7 +31,7 @@ export const queryClient = new QueryClient({
 });
 
 export async function apiRequest(url: string, options?: RequestInit) {
-  const res = await fetch(url, {
+  const res = await fetch(fullUrl(url), {
     ...options,
     credentials: "include",
     headers: {
