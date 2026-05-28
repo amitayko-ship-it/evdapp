@@ -30,7 +30,18 @@ export function registerRoutes(app: Express) {
       req.session.userId = user.id;
       res.json(user);
     } catch (error: any) {
+      console.error("Login error:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/health", async (_req: Request, res: Response) => {
+    try {
+      await storage.healthCheck();
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("Health check error:", error);
+      res.status(500).json({ ok: false, error: error.message });
     }
   });
 

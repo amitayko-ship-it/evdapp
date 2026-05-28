@@ -338,3 +338,7 @@ export async function setSetting(key: string, value: string) {
     await db.insert(appSettings).values({ key, value });
   }
 }
+
+export async function healthCheck() {
+  await db.execute(sql`SELECT 1`);
+}
